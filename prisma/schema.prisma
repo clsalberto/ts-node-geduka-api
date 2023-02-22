@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Location {
+  id       String @id @db.Uuid
+  zipCode  String @map("zip_code") @db.Char(9)
+  place    String @db.VarChar()
+  district String @db.VarChar()
+  city     String @db.VarChar()
+  state    String @db.Char(2)
+  country  String @db.Char(3)
+
+  addresses Address[]
+
+  @@index([zipCode, state])
+  @@map("locations")
+}
+
+model Address {
+  id             String  @id @db.Uuid
+  locationId     String  @map("location_id") @db.Uuid
+  number         String  @db.VarChar(8)
+  complement     String? @db.VarChar(60)
+  referencePoint String? @map("reference_point") @db.VarChar()
+  lng            Float?  @db.Real
+  lat            Float?  @db.Real
+
+  location Location @relation(fields: [locationId], references: [id])
+
+  tenants Tenant[]
+
+  @@index([locationId])
+  @@map("addresses")
+}
+
+model Tenant {
+  id          String   @id @db.Uuid
+  addressId   String   @map("address_id") @db.Uuid
+  fantasyName String   @map("fantasy_name") @db.VarChar()
+  companyName String   @map("company_name") @db.VarChar()
+  cnpj        String   @db.Char(18)
+  phone       String   @db.Char(16)
+  email       String   @db.VarChar()
+  domain      String   @db.VarChar(60)
+  createdAt   DateTime @map("created_at") @db.Timestamp()
+
+  address Address @relation(fields: [addressId], references: [id])
+
+  users User[]
+
+  @@index([addressId, cnpj, email, domain])
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   @db.VarChar()
+  email     String   @db.VarChar()
+  password  String   @db.Text
+  createdAt DateTime @map("created_at") @db.Timestamp()
+  active    Boolean  @db.Boolean
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  tokens      Token[]
+  roles       Role[]       @relation("roles_users")
+  permissions Permission[] @relation("permissions_users")
+
+  @@index([tenantId, email])
+  @@map("users")
+}
+
+model Token {
+  id        String   @id @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  hash      String   @db.Text
+  expiredAt DateTime @map("expired_at") @db.Timestamp()
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, hash])
+  @@map("tokens")
+}
+
+model Role {
+  id          String  @id @db.Uuid
+  name        String  @unique @db.VarChar(60)
+  description String? @db.Text
+
+  users       User[]       @relation("roles_users")
+  permissions Permission[] @relation("permissions_roles")
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @db.Uuid
+  name        String  @unique @db.VarChar(120)
+  description String? @db.Text
+
+  roles Role[] @relation("permissions_roles")
+  users User[] @relation("permissions_users")
+
+  @@map("permissios")
+}
